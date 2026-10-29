@@ -1,0 +1,8 @@
+node_modules/
+.env
+*.session
+*.session-journal
+.venv/
+__pycache__/
+*.tmp
+.DS_Store
