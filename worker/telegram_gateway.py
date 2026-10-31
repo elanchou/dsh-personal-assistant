@@ -239,6 +239,8 @@ async def on_left(_: PyTgCalls, update: ChatUpdate) -> None:
 
 
 def outcome_of(error: Exception) -> str:
+    if 'USER_PRIVACY_RESTRICTED' in str(error):
+        return 'privacy'
     if isinstance(error, TimedOutAnswer):
         return 'noanswer'
     if isinstance(error, CallBusy):

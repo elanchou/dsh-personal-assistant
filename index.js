@@ -1,5 +1,6 @@
 import { BASE, createBridge } from './lib/bridge.js';
 import { buildSchema, normalizeConfig } from './lib/config.js';
+import { createSettingsStore } from './lib/settings.js';
 import { createWorkers } from './lib/workers.js';
 
 export const name = 'livekit-telegram-voice';
@@ -10,9 +11,10 @@ const BOARD_WATCH_MS = 5000;
 
 export function apply(ctx, rawConfig) {
   // Read through a function so a settings change applies without rebuilding the objects below.
-  const settings = () => normalizeConfig(rawConfig);
+  const store = createSettingsStore(() => normalizeConfig(rawConfig));
+  const settings = () => store.get();
   const workers = createWorkers(ctx, settings);
-  const bridge = createBridge(ctx, settings, workers);
+  const bridge = createBridge(ctx, settings, workers, store);
 
   ctx.effect(() => ctx.webServer.register({
     kind: 'prefix',
@@ -34,11 +36,11 @@ export function apply(ctx, rawConfig) {
     return () => clearInterval(timer);
   }, 'livekit-telegram-voice: task watcher');
 
-  if (settings().autoStart) {
-    // Start after the web server route is registered so the workers can reach the API at once.
-    ctx.effect(() => {
-      workers.start();
-      return () => workers.stop();
-    }, 'livekit-telegram-voice: voice workers');
-  }
+  // Start after the web server route is registered so the workers can reach the API at once.
+  // Settings saved on the page are read first, so autoStart reflects them.
+  ctx.effect(() => {
+    let disposed = false;
+    void store.load().then(() => { if (!disposed && settings().autoStart) workers.start(); });
+    return () => { disposed = true; return workers.stop(); };
+  }, 'livekit-telegram-voice: voice workers');
 }
